@@ -1,0 +1,34 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Auth Check
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // 1. Employee Profiles (Profile Photo upload limits)
+    match /employee_profiles/{employeeId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == employeeId && request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // 2. Attendance Selfies (Protected Access)
+    match /attendance_selfies/{employeeId}/{allPaths=**} {
+      allow read: if isAuthenticated() && (request.auth.uid == employeeId || request.auth.token.role == 'admin' || request.auth.token.role == 'manager');
+      allow write: if isAuthenticated() && request.auth.uid == employeeId && request.resource.size < 2 * 1024 * 1024 && request.resource.contentType.matches('image/.*');
+    }
+
+    // 3. Payslips (Strictly Restricted to Admins & Owners)
+    match /payslips/{employeeId}/{allPaths=**} {
+      allow read: if isAuthenticated() && (request.auth.uid == employeeId || request.auth.token.role == 'admin');
+      allow write: if request.auth.token.role == 'admin'; // Writes only by Admin console
+    }
+
+    // 4. Leave Attachments (Medical Certificates, Receipts)
+    match /leave_attachments/{employeeId}/{allPaths=**} {
+      allow read: if isAuthenticated() && (request.auth.uid == employeeId || request.auth.token.role == 'admin' || request.auth.token.role == 'manager');
+      allow write: if isAuthenticated() && request.auth.uid == employeeId && request.resource.size < 5 * 1024 * 1024;
+    }
+  }
+}

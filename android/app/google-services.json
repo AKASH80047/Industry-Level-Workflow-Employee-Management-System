@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "625509958927",
+    "project_id": "placeholder-attendance-app",
+    "storage_bucket": "placeholder-attendance-app.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:625509958927:android:1234567890abcdef",
+        "android_client_info": {
+          "package_name": "com.example.industry_leavel_employee_attendence_workforce_management_system"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDummyAndroidApiKeyForCompilationOnly"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

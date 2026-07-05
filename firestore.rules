@@ -1,0 +1,88 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Auth Helper
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // User Role Verification Helpers
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && getUserData().role == 'admin';
+    }
+    
+    function isManager() {
+      return isAuthenticated() && getUserData().role == 'manager';
+    }
+
+    function isEmployee() {
+      return isAuthenticated() && getUserData().role == 'employee';
+    }
+    
+    // 1. Users Security Limits
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
+    }
+    
+    // 2. Employees Details Permissions
+    match /employees/{employeeId} {
+      allow read: if isAuthenticated() && (request.auth.uid == employeeId || isAdmin() || isManager());
+      allow create, update: if isAdmin();
+      // Allow employee to edit profile settings fields only
+      allow update: if isAuthenticated() && request.auth.uid == employeeId 
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['profilePhotoUrl', 'phone', 'fcmToken']);
+    }
+    
+    // 3. Attendance Logs Security
+    match /attendance/{attendanceId} {
+      allow read: if isAuthenticated() && (resource.data.employeeId == request.auth.uid || isAdmin() || isManager());
+      allow create: if isAuthenticated() && request.resource.data.employeeId == request.auth.uid;
+      // Allow employee checkouts and break updates, prevent altering historical items
+      allow update: if isAuthenticated() && (isAdmin() || (resource.data.employeeId == request.auth.uid && !resource.data.checkIn.mockLocationDetected));
+    }
+    
+    // 4. Leave Request Constraints
+    match /leave_requests/{requestId} {
+      allow read: if isAuthenticated() && (resource.data.employeeId == request.auth.uid || resource.data.managerId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.employeeId == request.auth.uid;
+      // Managers approve, employees edit pending items
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.managerId == request.auth.uid || (resource.data.employeeId == request.auth.uid && resource.data.status == 'pending'));
+    }
+
+    // 5. Regularization Requests Constraints
+    match /regularization_requests/{requestId} {
+      allow read: if isAuthenticated() && (resource.data.employeeId == request.auth.uid || resource.data.managerId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.employeeId == request.auth.uid;
+      allow update: if isAuthenticated() && (isAdmin() || resource.data.managerId == request.auth.uid);
+    }
+
+    // 6. Global Setup Rules (Offices, Shifts, Holidays)
+    match /offices/{officeId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /shifts/{shiftId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /holidays/{holidayId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // 7. Audit Logging Security (Append-Only)
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated(); 
+      allow update, delete: if false; // Strict append-only restriction
+    }
+  }
+}
